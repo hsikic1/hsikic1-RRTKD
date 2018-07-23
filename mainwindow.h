@@ -30,7 +30,7 @@ private:
     int sum;
     int segNumber;
     double epsilon, epsilon0;
-    std::vector<double> weights;
+    std::vector<double> weights, uweights;
     QVector<double> x, y;
     std::vector<fcl::Vector3<double>> environmentVertices;
     std::vector<fcl::Triangle> environmentTriangles;
@@ -48,7 +48,7 @@ private:
 private slots:
     void parseSTL(std::string path, std::vector<fcl::Vector3<double>> &vertices, std::vector<fcl::Triangle> &triangles);
     void loadMeshes(std::string robotPath, std::string envPath);
-    void initRRT(Eigen::VectorXd xinit, Eigen::VectorXd xgoal, std::list<std::pair<Eigen::Vector2d , double>> &obstacles);
+    void initRRT(int depth, Eigen::VectorXd xinit, Eigen::VectorXd xgoal, std::list<std::pair<Eigen::Vector2d , double>> &obstacles);
     rrtNode *extendRRTStar(int &lastsize, int &count, rrtNode *&epsilonNode, kdTree *&nodes, std::vector<std::pair<Eigen::VectorXd, rrtNode*>> &nodesVector, Eigen::VectorXd xrandom, std::list<std::pair<Eigen::Vector2d, double>> &obstacles, Eigen::VectorXd xgoal);
 
 private:

@@ -26,7 +26,7 @@
 #include <cmath>
 
 
-#define delta 0.08
+#define delta 0.001
 #define R 10.5959179423
 
 MainWindow::MainWindow(QWidget *parent) :
@@ -34,31 +34,60 @@ MainWindow::MainWindow(QWidget *parent) :
     ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
-    ui->customPlot->xAxis->setRange(-5,2*M_PI+0.1);
-    ui->customPlot->yAxis->setRange(-5,2*M_PI+0.1);
+    ui->customPlot->xAxis->setRange(-5,6);
+    ui->customPlot->yAxis->setRange(-5,6);
 
-    //weights = {10*0.458333, 10*0.291666, 10*0.166666, 10*0.083333};
-    weights = {4*1.0000, 4*0.6833, 4*0.15835, 4*0.15835};
+    weights = {4*0.458333, 4*0.291666, 4*0.166666, 4*0.083333};
+    uweights = weights;
+
+    //4*0.15835
+    //weights = {4*1.0000, 4*0.6833, 4*0.15835, 4*0.15835};
+    //weights = {4*0.05, 4*0.45, 4*0.4, 4*0.1};
 
     segNumber = 4;
-    epsilon = 0.2;
+    epsilon = 0.1;
     epsilon0 = epsilon;
 
     Eigen::VectorXd xgoal(segNumber);
-    xgoal(0) = 0.7153;
-    xgoal(1) = -0.7453;
-    xgoal(2) = 0.801686;
-    xgoal(3) = 0;
+    xgoal(0) = 1.7;//0.7153;
+    xgoal(1) = 0.5;//-0.7453;
+    xgoal(2) = 0.34;
+    xgoal(3) = 0.55;
 
     Eigen::VectorXd xinit(segNumber);
     xinit(0) = M_PI;
-    xinit(1) = 0;
-    xinit(2) = 0;
-    xinit(3) = 0;
+    xinit(1) = -0.4;
+    xinit(2) = -0.5;
+    xinit(3) = -0.5;
     segLengths = {2.0, 1.5, 1, 1};
 
-    std::list<std::pair<Eigen::Vector2d, double>> obstacles{std::make_pair(Eigen::Vector2d(-1.6*1.4,1.8*sqrt(2)), 1), std::make_pair(Eigen::Vector2d(1.9*std::sqrt(2),1.9*sqrt(2)), 1),std::make_pair(Eigen::Vector2d(1.7*std::sqrt(2),-0.5), 1), std::make_pair(Eigen::Vector2d(5,0), 1.9)};
-    initRRT(xinit, xgoal, obstacles);
+    //scenarij 1
+    /* *
+     * std::list<std::pair<Eigen::Vector2d, double>> obstacles{std::make_pair(Eigen::Vector2d(-1.6*1.4,1.8*sqrt(2)), 1), std::make_pair(Eigen::Vector2d(1.9*std::sqrt(2),1.9*sqrt(2)), 1),std::make_pair(Eigen::Vector2d(1.7*std::sqrt(2),-0.5), 1), std::make_pair(Eigen::Vector2d(5,0), 1.9)};
+     * xgoal(0) = 0.7153;
+       xgoal(1) = -0.7453;
+       xgoal(2) = 0.801686;
+       xgoal(3) = 0;
+
+       xinit(0) = M_PI;
+       xinit(1) = 0;
+       xinit(2) = 0;
+       xinit(3) = 0;
+     * */
+    //std::make_pair(Eigen::Vector2d(2,4), 1.2), std::make_pair(Eigen::Vector2d(1.5,4.2), 1), std::make_pair(Eigen::Vector2d(1,4.2), 1), std::make_pair(Eigen::Vector2d(0.5,4.2), 1),std::make_pair(Eigen::Vector2d(0,4.2), 1), std::make_pair(Eigen::Vector2d(-0.5,4.2), 1), std::make_pair(Eigen::Vector2d(-1,4.2), 1), std::make_pair(Eigen::Vector2d(-1.5,4.2), 1),
+    std::list<std::pair<Eigen::Vector2d, double>> obstacles{std::make_pair(Eigen::Vector2d(-1,-1), 1),
+                                                            std::make_pair(Eigen::Vector2d(-0.5,-1), 1),
+                                                            std::make_pair(Eigen::Vector2d(-1.6*1.4,6), 1),
+                                                            std::make_pair(Eigen::Vector2d(-1.6*1.4,5.5), 1),
+                                                            std::make_pair(Eigen::Vector2d(-1.6*1.4,5), 1),
+                                                            std::make_pair(Eigen::Vector2d(-1.6*1.4,1.8*sqrt(2)), 1),
+                                                            std::make_pair(Eigen::Vector2d(-1.6*1.4,1.5*sqrt(2)), 1),
+                                                            std::make_pair(Eigen::Vector2d(1.65,1), 0.9),
+                                                            std::make_pair(Eigen::Vector2d(1.65,1.5), 0.9),
+                                                            std::make_pair(Eigen::Vector2d(1.65,2), 0.9),
+                                                            std::make_pair(Eigen::Vector2d(1.65,2.5), 0.9),
+                                                            std::make_pair(Eigen::Vector2d(1.65,3), 0.9)};
+    initRRT(0, xinit, xgoal, obstacles);
 }
 
 void MainWindow::parseSTL(std::string path, std::vector<fcl::Vector3<double>> &vertices, std::vector<fcl::Triangle> &triangles){
@@ -146,18 +175,18 @@ bool MainWindow::simpleCollisionCheck(Eigen::Vector2d center, double radius, Eig
                 angles[j-1] += angles[j-2];
 
             for(int k = 0; k < j; k++){
-                fKine[j](0) += segLengths[k]*cos(angles[k]);
-                fKine[j](1) += segLengths[k]*sin(angles[k]);
+                fKine[j](0) += segLengths[k]*std::cos(angles[k]);
+                fKine[j](1) += segLengths[k]*std::sin(angles[k]);
             }
 
-            if(((((center - fKine[j-1]).dot((fKine[j] - fKine[j-1]).normalized())*((fKine[j] - fKine[j-1]).normalized()) + (center - fKine[j-1])).norm() < radius + delta)) || ((center-fKine[j]).norm() < radius + delta) || ((center-fKine[j-1]).norm() < radius + delta))
+            if((((((center - fKine[j-1]).dot((fKine[j] - fKine[j-1]).normalized())*((fKine[j] - fKine[j-1]).normalized()) - (center - fKine[j-1])).norm() < radius)) && ((center - fKine[j-1]).dot(fKine[j] - fKine[j-1]) > 0) && ((center - fKine[j]).dot(fKine[j-1] - fKine[j]) > 0) || ((center-fKine[j]).norm() <= radius + delta) || ((center-fKine[j-1]).norm() <= radius + delta)))
                 return true;
         }
     }
     return false;
 }
 
-void MainWindow::initRRT(Eigen::VectorXd xinit, Eigen::VectorXd xgoal, std::list<std::pair<Eigen::Vector2d , double>> &obstacles){  
+void MainWindow::initRRT(int depth, Eigen::VectorXd xinit, Eigen::VectorXd xgoal, std::list<std::pair<Eigen::Vector2d , double>> &obstacles){
     Eigen::VectorXd T(segNumber);
     std::vector<std::pair<Eigen::VectorXd, rrtNode*>> nodesVector(500, std::make_pair(Eigen::VectorXd(segNumber), nullptr));
     rrtNode *initRRTN(new rrtNode(xinit, nullptr, 0)), *rrtPtr(nullptr), *rrtNew(nullptr), *dummyNode(nullptr), *lastlastNode;
@@ -166,8 +195,10 @@ void MainWindow::initRRT(Eigen::VectorXd xinit, Eigen::VectorXd xgoal, std::list
     kdTree *nodes;  
     QPen pen;
 
+    if(depth > 1)
+        return;
     for(int i = 0; i < segNumber; i++)
-        T(i) = 10*M_PI;
+        T(i) = 20*M_PI;
     for(int i= 0; i < nodesVector.size(); i++){
         nodesVector[i].first = T;
     }
@@ -205,13 +236,20 @@ void MainWindow::initRRT(Eigen::VectorXd xinit, Eigen::VectorXd xgoal, std::list
             }
         }
 
+        //epsilon0 /= 1.00000000005;
         rrtNew = extendRRTStar(lastSize, count, lastNode, nodes, nodesVector, xrandom, obstacles, xgoal);
         currGoal = xgoal;
         epsilon = epsilon0;
 
         if ((lastNode == nullptr)){
-            epsilon = 0.5*epsilon0;
-            double minDist(2*M_PI);
+            for(int j = 0; j < 5; j++){
+                if(lastlastNode->parentNode != nullptr)
+                    lastlastNode = lastlastNode->parentNode;
+            }
+
+            epsilon = 1.5*epsilon0;
+
+            double minDist(20*M_PI);
             for (int j = 0; j < segNumber; j++){
                 if(weights[j]*std::abs(lastlastNode->nodePosition[j] - xgoal(j)) <= minDist){
                     minDist = weights[j]*std::abs(lastlastNode->nodePosition(j) - xgoal(j));
@@ -229,7 +267,7 @@ void MainWindow::initRRT(Eigen::VectorXd xinit, Eigen::VectorXd xgoal, std::list
                 lastNode->nodePosition(j) = dummyVector(j)*weights[j];
                 currGoal(j) = dummyVector2(j);
                 if(j == dominantDimension){
-                    lastNode->nodePosition(j) = lastlastNode->nodePosition(j)*weights[j];
+                    lastNode->nodePosition(j) = lastlastNode->nodePosition(j);//*weights[j];
                 }
             }
             missed ++;
@@ -241,7 +279,8 @@ void MainWindow::initRRT(Eigen::VectorXd xinit, Eigen::VectorXd xgoal, std::list
             std::cout << "Broj iteracija: " << i << std::endl;
             break;
         }
-        lastlastNode = lastNode;
+        if(lastNode != nullptr)
+            lastlastNode = lastNode;
     }
 
     std::chrono::high_resolution_clock::time_point t2 = std::chrono::high_resolution_clock::now();
@@ -265,12 +304,9 @@ void MainWindow::initRRT(Eigen::VectorXd xinit, Eigen::VectorXd xgoal, std::list
             pen.setColor(QColor(66,131,244));
             line->setPen(pen);
         }
-    }*/
-    if(rrtPtr == nullptr){
-        return;
     }
 
-    /*while(rrtPtr->parentNode != nullptr){
+    while(rrtPtr->parentNode != nullptr){
         auto line = new QCPItemLine(ui->customPlot);
         line->start->setCoords(rrtPtr->nodePosition[0], rrtPtr->nodePosition[1]);
         line->end->setCoords(rrtPtr->parentNode->nodePosition[0], rrtPtr->parentNode->nodePosition[1]);
@@ -282,58 +318,12 @@ void MainWindow::initRRT(Eigen::VectorXd xinit, Eigen::VectorXd xgoal, std::list
         line->setPen(pen);
         rrtPtr = rrtPtr->parentNode;
     }*/
-
-    while(rrtPtr != nullptr){
-        std::vector<double> angles(segNumber, 0);
-        Eigen::VectorXd fKineVec1(2);
-        Eigen::VectorXd fKineVec2(2);
-
-        for(int i = 1; i < segNumber + 1; i++){
-            fKineVec1(0) = 0;
-            fKineVec1(1) = 0;
-            fKineVec2(0) = 0;
-            fKineVec2(1) = 0;
-            angles[i -1] += rrtPtr->nodePosition[i -1];
-
-            if(i - 1 > 0)
-                angles[i - 1] += angles[i -2];
-
-            for(int j = 0; j < i; j++){
-                fKineVec2(0) += segLengths[j]*std::cos(angles[j]);
-                fKineVec2(1) += segLengths[j]*std::sin(angles[j]);
-                if(j < i - 1){
-                    fKineVec1(0) += segLengths[j]*std::cos(angles[j]);
-                    fKineVec1(1) += segLengths[j]*std::sin(angles[j]);
-                }
-            }
-
-            auto line = new QCPItemLine(ui->customPlot);
-
-            if(rrtPtr == rrtNew){
-                pen.setWidth(5);
-                pen.setColor(QColor(66,131,244));
-                line->setPen(pen);
-            }
-
-            if(rrtPtr->parentNode == nullptr){
-                pen.setWidth(5);
-                pen.setColor(QColor(163, 23, 13));
-                line->setPen(pen);
-
-            }
-
-            line->start->setCoords(fKineVec1[0], fKineVec1[1]);
-            line->end->setCoords(fKineVec2[0], fKineVec2[1]);
-        }
-
-        rrtPtr = rrtPtr->parentNode;
-    }
-
-    //obstacles = {std::make_pair(Eigen::Vector2d(-1.6*5,5*sqrt(2)), 1),std::make_pair(Eigen::Vector2d(-1.6*1.4,1.8*sqrt(2)), 1),std::make_pair(Eigen::Vector2d(1.9*std::sqrt(2),1.9*sqrt(2)), 1),std::make_pair(Eigen::Vector2d(1.7*std::sqrt(2),-0.5), 1), std::make_pair(Eigen::Vector2d(5,0), 1.5),std::make_pair(Eigen::Vector2d(0,-2.5), 1.5)};
     std::list<std::pair<Eigen::Vector2d, double>>::iterator obstacleIterator(obstacles.begin());
 
     QVector<double> x(0), y(0);
     ui->customPlot->addGraph();
+    ui->customPlot->graph()->setPen(pen);
+    pen.setColor(QColor(52,87,155));
 
     while(obstacleIterator != obstacles.end()){
         for(int i = 0; i < 500; i++){
@@ -341,16 +331,68 @@ void MainWindow::initRRT(Eigen::VectorXd xinit, Eigen::VectorXd xgoal, std::list
             y.append((*obstacleIterator).second*std::sin(i*M_PI/250) + (*obstacleIterator).first[1]);
         }
         ui->customPlot->graph()->addData(x,y);
+        ui->customPlot->graph()->setPen(pen);
+        pen.setColor(QColor(52,87,155));
         x.clear();
         y.clear();
         obstacleIterator++;
         ui->customPlot->addGraph();
     }
+
+    if(rrtPtr != nullptr){
+        while(rrtPtr != nullptr){
+            std::vector<double> angles(segNumber, 0);
+            Eigen::VectorXd fKineVec1(2);
+            Eigen::VectorXd fKineVec2(2);
+
+            for(int i = 1; i < segNumber + 1; i++){
+                fKineVec1(0) = 0;
+                fKineVec1(1) = 0;
+                fKineVec2(0) = 0;
+                fKineVec2(1) = 0;
+                angles[i -1] += rrtPtr->nodePosition[i -1];
+
+                if(i - 1 > 0)
+                    angles[i - 1] += angles[i -2];
+
+                for(int j = 0; j < i; j++){
+                    fKineVec2(0) += segLengths[j]*std::cos(angles[j]);
+                    fKineVec2(1) += segLengths[j]*std::sin(angles[j]);
+                    if(j < i - 1){
+                        fKineVec1(0) += segLengths[j]*std::cos(angles[j]);
+                        fKineVec1(1) += segLengths[j]*std::sin(angles[j]);
+                    }
+                }
+
+                auto line = new QCPItemLine(ui->customPlot);
+
+                if(rrtPtr == rrtNew){
+                    pen.setWidth(5);
+                    pen.setColor(QColor(66,131,244));
+                    line->setPen(pen);
+                }
+
+                if(rrtPtr->parentNode == nullptr){
+                    pen.setWidth(5);
+                    pen.setColor(QColor(163, 23, 13));
+                    line->setPen(pen);
+
+                }
+
+                line->start->setCoords(fKineVec1[0], fKineVec1[1]);
+                line->end->setCoords(fKineVec2[0], fKineVec2[1]);
+            }
+
+            rrtPtr = rrtPtr->parentNode;
+        }
+    }
+
+
     //________________________________________________________________________________________________________________
 }
 
 //EXTEND RRT*
-rrtNode *MainWindow::extendRRTStar(int &lastsize,int &count, rrtNode *&epsilonNode, kdTree *&nodes, std::vector<std::pair<Eigen::VectorXd, rrtNode*>> &nodesVector, Eigen::VectorXd xrandom, std::list<std::pair<Eigen::Vector2d , double>> &obstacles, Eigen::VectorXd xgoal){
+rrtNode *MainWindow::extendRRTStar(int &lastsize ,int &count, rrtNode *&epsilonNode, kdTree *&nodes, std::vector<std::pair<Eigen::VectorXd, rrtNode*>> &nodesVector, Eigen::VectorXd xrandom, std::list<std::pair<Eigen::Vector2d , double>> &obstacles, Eigen::VectorXd xgoal){
     std::list<std::pair<Eigen::Vector2d, double>>::iterator obstacleIterator(obstacles.begin());
     std::set<kdTreeNode *>::iterator nIterator;
     std::set<kdTreeNode *> nearestNeighbors;
@@ -360,7 +402,7 @@ rrtNode *MainWindow::extendRRTStar(int &lastsize,int &count, rrtNode *&epsilonNo
     double m, dist(20*M_PI*1.41);
 
     epsilonNode = nullptr;
-    if((count == 500) ){ ///zamijeniti nekim countom jer je ovaj niz vec 250 i pogledati kdtree build napomenu !!!
+    if((count == 500) ){
         nodes = new kdTree(segNumber, nodesVector, weights);
         lastsize = count;
     }
@@ -383,6 +425,7 @@ rrtNode *MainWindow::extendRRTStar(int &lastsize,int &count, rrtNode *&epsilonNo
     }
 
     xepsilon = epsilon*(xrandom - xmin->nodePosition).normalized() + xmin->nodePosition;
+
     while(obstacleIterator != obstacles.end()){
         if(simpleCollisionCheck(obstacleIterator->first, obstacleIterator->second, xmin->nodePosition, xepsilon))
             return nullptr;
