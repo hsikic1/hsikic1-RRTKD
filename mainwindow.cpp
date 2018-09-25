@@ -41,7 +41,7 @@ MainWindow::MainWindow(QWidget *parent, int rType) :
     ui->setupUi(this);
     ui->customPlot->xAxis->setRange(-5,6);
     ui->customPlot->yAxis->setRange(-5,6);
-    epsilon = 0.15;
+    epsilon = 0.1;
     epsilon0 = epsilon;
 
     if(robotType == ROBOT_PLANAR){
@@ -94,22 +94,22 @@ MainWindow::MainWindow(QWidget *parent, int rType) :
     if(robotType == ROBOT_3D){
         std::list<std::pair<Eigen::Vector2d, double>> obstacles{};
 
-        loadMeshes("/home/haris/Desktop/robot/solid.robot", "");
+        loadMeshes("/home/haris/Desktop/robot/solid.robot", "");//"/home/haris/Desktop/robot/obstacle.robot");
         Eigen::VectorXd xinit(segNumber), xgoal(segNumber);
 
         xgoal(0) = 0;
-        xgoal(1) = -1.29626;
-        xgoal(2) = 1.42645;
+        xgoal(1) = 90*M_PI/180;
+        xgoal(2) = -70*M_PI/180;
         xgoal(3) = 0;
-        xgoal(4) = -M_PI/2;
+        xgoal(4) = 0;
         xgoal(5) = 0;
 
         xinit(0) = 0;
-        xinit(1) = M_PI/6;
-        xinit(2) = -0.1745;
+        xinit(1) = 0*M_PI/180;
+        xinit(2) = 0*M_PI/180;
         xinit(3) = 0;
-        xinit(2) = 0;
-        xinit(3) = 0;
+        xinit(4) = 0;
+        xinit(5) = 0;
 
         initRRT(0, xinit, xgoal, obstacles);
     }
@@ -131,12 +131,12 @@ MainWindow::MainWindow(QWidget *parent, int rType) :
         std::cout << jointHandle;
         int i(0), m(100);
         while(true){
-            conf(1) = (-1)*i*M_PI/(2*m);
+            conf(1) = (1)*i*M_PI/(2*m);
             if(FCLCollisionCheck(conf, conf)){
                     std::cout << "DDDDDDDDDDD";
                     return;
             }
-            simxSetJointTargetPosition(clientID,jointHandle, (-1)*i*M_PI/(2*m), simx_opmode_oneshot);
+            simxSetJointTargetPosition(clientID,jointHandle, (1)*i*M_PI/(2*m), simx_opmode_oneshot);
             if((i < m) && bFlag){
                 std::this_thread::sleep_for(std::chrono::milliseconds(60));
                 i++;
@@ -184,17 +184,17 @@ void MainWindow::parseSTL(std::string path, std::vector<fcl::Vector3<double>> &v
 }
 
 void MainWindow::loadMeshes(std::string robotPath, std::string envPath){
+    std::cout << "A";
     std::ifstream robotJsonFileStream(robotPath), envJsonFileStream(envPath);
     rapidjson::IStreamWrapper robotJsonStreamWrapper(robotJsonFileStream), envJsonStreamWrapper(envJsonFileStream);
     rapidjson::Document robotDocInst, envDocInst;
-
     robotDocInst.ParseStream(robotJsonStreamWrapper);
     envDocInst.ParseStream(envJsonStreamWrapper);
     segNumber = robotDocInst.MemberCount();
     lLimit = Eigen::VectorXd(segNumber);
     uLimit = Eigen::VectorXd(segNumber);
 
-    for(int k = 0; k < robotDocInst.MemberCount(); k++){
+    for(unsigned int k = 0; k < robotDocInst.MemberCount(); k++){
         std::ostringstream tempStream("seg", std::ios::ate);
         tempStream << k + 1;
         DHTable.push_back(std::vector<double>{robotDocInst[tempStream.str().c_str()].GetObject()["a"].GetDouble()/1000, robotDocInst[tempStream.str().c_str()].GetObject()["alpha"].GetDouble()*M_PI/180, robotDocInst[tempStream.str().c_str()].GetObject()["d"].GetDouble()/1000, robotDocInst[tempStream.str().c_str()].GetObject()["theta"].GetDouble()*M_PI/180});
@@ -206,15 +206,18 @@ void MainWindow::loadMeshes(std::string robotPath, std::string envPath){
         parseSTL((std::string("/home/haris/Desktop/robot/") + robotDocInst[tempStream.str().c_str()].GetObject()["parts"].GetString()).c_str(), robotSegVertices[k], robotSegTriangles[k]);
     }
 
-    /*for(unsigned int k = 0; k < envDocInst.MemberCount(); k++){
-        std::ostringstream tempStream("obs", std::ios::ate);
+    environmentObjectCount = 1;
+    /*for(int k = 0; k < 2; k++){
+        std::ostringstream tempStream("obstacle", std::ios::ate);
         tempStream << k + 1;
-
+        tempStream << ".stl";
+        std::cout << tempStream.str();
         environmentVertices.push_back(std::vector<fcl::Vector3<double>>());
         environmentTriangles.push_back(std::vector<fcl::Triangle>());
 
-        parseSTL(std::string("/home/haris/Desktop/robot/") + envDocInst[tempStream.str().c_str()].GetObject()["parts"].GetString(), environmentVertices[k], environmentTriangles[k]);
+        parseSTL(std::string("/home/haris/Desktop/robot/") + (tempStream.str()), environmentVertices[k], environmentTriangles[k]);
     }*/
+
 
     environmentObjectCount = 1;
     environmentVertices.push_back(std::vector<fcl::Vector3<double>>());
@@ -240,27 +243,31 @@ double MainWindow::weightedNorm(Eigen::VectorXd x, int dimension){
 
 
 bool MainWindow::FCLCollisionCheck(Eigen::VectorXd A, Eigen::VectorXd B){
-    for(int i = 0; i < 3; i++){
+    for(int i = 0; i < 5; i++){
         fcl::Transform3<double> transform;
-        Eigen::VectorXd step(A + ((double)i/3.00)*(B-A).norm()*(B-A).normalized());
+        Eigen::VectorXd step(A + (((double)i)/5.00)*(B-A).norm()*(B-A).normalized());
         std::vector<std::vector<fcl::Vector3<double>>>  tempRobotSegVertices(robotSegVertices);
 
         transform.setIdentity();
         for(int j = 0; j < segNumber; j++){
-            Eigen::Transform<double, 3, Eigen::Isometry> localRot, tempTransform;;
+            Eigen::Transform<double, 3, Eigen::Isometry> localRot, tempTransform, invTempTransform;
 
             localRot.setIdentity();
             localRot(0,0) = std::cos(step(j)); localRot(0,1) = (-1)*std::sin(step(j)); localRot(0,2) = 0;
             localRot(1,0) = std::sin(step(j)); localRot(1,1) = std::cos(step(j)); localRot(1,2) = 0;
             localRot(2,0) = 0; localRot(2,1) = 0; localRot(2,2) = 1;
 
-            for(int m = j; m < segNumber; m++)
-                std::for_each(tempRobotSegVertices[m].begin(), tempRobotSegVertices[m].end(), [&](fcl::Vector3<double> &vert){vert = transform*localRot*(transform.inverse())*vert;});
+            invTempTransform.setIdentity();
+            invTempTransform.linear() = transform.linear().transpose();
+            invTempTransform.translation() = (-1)*(transform.linear().transpose())*(transform.translation());
 
+            for(int m = j; m < segNumber; m++)
+                std::for_each(tempRobotSegVertices[m].begin(), tempRobotSegVertices[m].end(), [&](fcl::Vector3<double> &vert){vert = transform*localRot*(invTempTransform)*vert;});
 
            for(int k = 0; k < environmentObjectCount; k++){
-               if(collide_Test<fcl::AABB<double>>(fcl::Transform3<double>::Identity(), tempRobotSegVertices[j], robotSegTriangles[j], environmentVertices[k], environmentTriangles[k], detail::SPLIT_METHOD_MEDIAN, false))
+               if(collide_Test<fcl::AABB<double>>(fcl::Transform3<double>::Identity(), tempRobotSegVertices[j], robotSegTriangles[j], environmentVertices[k], environmentTriangles[k], detail::SPLIT_METHOD_MEDIAN, false)){
                    return true;
+               }
            }
 
             tempTransform.setIdentity();
@@ -274,13 +281,14 @@ bool MainWindow::FCLCollisionCheck(Eigen::VectorXd A, Eigen::VectorXd B){
     return false;
 }
 
+
 bool MainWindow::simpleCollisionCheck(Eigen::Vector2d center, double radius, Eigen::VectorXd A, Eigen::VectorXd B){
     std::vector<Eigen::VectorXd>fKine = std::vector<Eigen::VectorXd>(segNumber + 1, Eigen::VectorXd(2));
     fKine[0](0) = 0;
     fKine[0](1) = 0;
 
-    for(int i = 0; i <= 5; i++){
-        Eigen::VectorXd step(A + ((double)i/5.00)*(B-A).norm()*(B-A).normalized());
+    for(int i = 0; i <= 50; i++){
+        Eigen::VectorXd step(A + ((double)i/50.00)*(B-A).norm()*(B-A).normalized());
         std::vector<double> angles(segNumber, 0);
 
         for(int j = 1; j < segNumber + 1; j++){
@@ -380,7 +388,7 @@ void MainWindow::initRRT(int depth, Eigen::VectorXd xinit, Eigen::VectorXd xgoal
                     lastlastNode = lastlastNode->parentNode;
             }
 
-            epsilon = 1.5*epsilon0;
+            epsilon = 0.5*epsilon0;
 
             double minDist(20*M_PI);
             for (int j = 0; j < segNumber; j++){
@@ -542,16 +550,17 @@ void MainWindow::initRRT(int depth, Eigen::VectorXd xinit, Eigen::VectorXd xgoal
                 tempStream << i + 1;
                 simxGetObjectHandle(clientID, tempStream.str().c_str(), &jointHandles[i], simx_opmode_blocking);
             }
-            //std::cout << pathConfs.size();
 
+            int cnt(pathConfs.size() - 1);
             for(int i = pathConfs.size() - 1; i >= 0; i--){
+                cnt = i;
                 for(int j = 0; j < segNumber; j++)
                     simxSetJointTargetPosition(clientID,jointHandles[j], pathConfs[i][j], simx_opmode_oneshot);
                 std::this_thread::sleep_for(std::chrono::milliseconds(60));
             }
             while(true){
                 for(int j = 0; j < segNumber; j++)
-                    simxSetJointTargetPosition(clientID,jointHandles[j], pathConfs[0][j], simx_opmode_oneshot);
+                    simxSetJointTargetPosition(clientID,jointHandles[j], pathConfs[cnt][j], simx_opmode_oneshot);
             }
         }
     }

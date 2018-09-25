@@ -35,6 +35,7 @@ private:
     bool enable_contact = true;
     std::vector<std::vector<double>> DHTable;
     int segNumber, environmentObjectCount, robotType;
+    int clientID;
     double epsilon, epsilon0;
     std::vector<double> weights;
     QVector<double> x, y;
